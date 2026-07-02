@@ -148,7 +148,7 @@ export const store = {
       lastAnalyzeAt: null,
       lastDispatchedAt: null,
       sweepIntervalMs: 8 * 60 * 60 * 1000,
-      analyzeIntervalMs: 24 * 60 * 60 * 1000,
+      analyzeIntervalMs: 8 * 60 * 60 * 1000,
       usingRealAgents: Boolean(process.env.TINYFISH_API_KEY),
     };
     if (!hasKv) return { ...fallback, ...memory.meta };

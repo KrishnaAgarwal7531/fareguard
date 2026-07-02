@@ -15,7 +15,7 @@ async function main() {
   const result = await runSweepAndMaybeAnalyze("github-actions-cron");
   const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
   console.log(
-    `[sweep] done in ${seconds}s — sites swept: ${result.sitesSwept}, booking requests triggered: ${result.triggeredCount}, ran daily analysis: ${result.analyzed}`
+    `[sweep] done in ${seconds}s — sites swept: ${result.sitesSwept}, booking requests triggered: ${result.triggeredCount}, ran analysis: ${result.analyzed}`
   );
 }
 

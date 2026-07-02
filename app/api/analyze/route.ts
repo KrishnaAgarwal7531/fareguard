@@ -21,7 +21,7 @@ export async function GET() {
 // POST: force-recompute recommendations from the full accumulated price
 // history right now. This one stays fast regardless of plan — it's a
 // single Groq call, not a multi-site browser sweep — so it's fine to run
-// inline on Vercel Cron directly (once a day).
+// inline whenever forced manually — the regular path is via runSweepAndMaybeAnalyze, which now runs analysis every sweep, not on a separate schedule.
 export async function POST(req: Request) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

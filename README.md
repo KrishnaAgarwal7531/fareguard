@@ -10,7 +10,7 @@ The real scraping does **not** run on Vercel. A 7-site TinyFish sweep can take l
 GitHub Actions (every 8 hours)
   → scripts/sweep.ts
   → calls TinyFish for all 7 sites in parallel
-  → if the daily analysis is due, also calls Groq
+  → then always calls Groq for fresh recommendations
   → writes everything straight to Redis
 
 Vercel (your deployed site)
@@ -29,7 +29,7 @@ Locally (`npm run dev`), there's no Vercel time limit at all, so the first time 
   - 6 of them go through the **TinyFish Agent API** with stealth mode — real browser automation, since their search forms have no shareable deep-link URL.
   - **Skyscanner VN** goes through the **TinyFish Fetch API** instead — it has a documented, public deep-link format (`/transport/flights/{from}/{to}/{YYMMDD}/`), so the page already has the answer with no clicking needed. Free, faster, and the extracted text is parsed into a price by a quick Groq call.
 - Routes tracked: Hanoi↔Ho Chi Minh City, Ho Chi Minh City↔Da Nang, Ho Chi Minh City↔Bangkok — searched for today's date (Vietnam time, UTC+7), one date per sweep, since the point of the 4-hourly cadence is watching the same date's price move, not scanning a range.
-- Once a day (checked after every sweep, so it self-corrects even if a run is missed), the full accumulated price history goes to Groq (Llama 3.3 70B) for a booking-window recommendation per route. Falls back to a built-in heuristic if no Groq key is set.
+- Every sweep (every 8 hours), the full accumulated price history goes to Groq (Llama 3.3 70B) for a booking-window recommendation per route — runs side by side with the price scrape, no separate schedule to track. Falls back to a built-in heuristic if no Groq key is set.
 - A "booking requests" tab lets a travel manager set a passenger, route, date, and threshold price. When the fare on the preferred site drops to that threshold, the status flips — for Vietjet specifically, this represents the agent having filled the booking form up to the final payment step (not yet wired to a real browser agent or payment — that's the next phase).
 
 ## Tech stack

@@ -28,14 +28,10 @@ export async function ensureSeeded() {
   return merged;
 }
 
-function isDue(lastAt: string | null, intervalMs: number): boolean {
-  if (!lastAt) return true;
-  return Date.now() - new Date(lastAt).getTime() >= intervalMs;
-}
-
 // The one function that does the real work: sweep all 7 sites, save prices,
-// check booking thresholds, and — only if the daily analysis is actually
-// due — run Groq immediately afterward. Called by exactly 3 places:
+// check booking thresholds, and run Groq analysis immediately afterward —
+// every time, side by side with the sweep, no separate schedule to reason
+// about. Called by exactly 3 places:
 //   - scripts/sweep.ts (the GitHub Actions cron job, in production)
 //   - the POST handler in local dev (the "Run sweep now" button)
 //   - bootstrapLocalDevIfNeeded (local dev, first-ever run only)
@@ -64,16 +60,11 @@ export async function runSweepAndMaybeAnalyze(reason: string) {
     usingRealAgents: Boolean(process.env.TINYFISH_API_KEY),
   });
 
-  const meta = await store.getMeta();
-  let analyzed = false;
-  if (isDue(meta.lastAnalyzeAt, meta.analyzeIntervalMs)) {
-    const recommendations = await buildRecommendations(priceSeries, routes);
-    await store.setRecommendations(recommendations);
-    await store.setMeta({ lastAnalyzeAt: new Date().toISOString() });
-    analyzed = true;
-  }
+  const recommendations = await buildRecommendations(priceSeries, routes);
+  await store.setRecommendations(recommendations);
+  await store.setMeta({ lastAnalyzeAt: new Date().toISOString() });
 
-  return { sitesSwept: Object.keys(agentStatuses).length, triggeredCount, analyzed };
+  return { sitesSwept: Object.keys(agentStatuses).length, triggeredCount, analyzed: true };
 }
 
 // Local-dev-only convenience: if a real TinyFish key is set and a sweep has
