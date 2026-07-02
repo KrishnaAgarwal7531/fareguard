@@ -1,4 +1,5 @@
 import type { SitePriceSeries, RouteRecommendation, RouteCode, RouteInfo } from "./types";
+import { getVietnamDateString } from "./date";
 
 function bestSeriesPerRoute(priceSeries: Record<string, SitePriceSeries>, routes: RouteInfo[]) {
   const byRoute: Record<RouteCode, SitePriceSeries[]> = {};
@@ -58,6 +59,7 @@ export async function buildRecommendations(priceSeries: Record<string, SitePrice
 
   try {
     const byRoute = bestSeriesPerRoute(priceSeries, routes);
+    const todayStr = getVietnamDateString();
     const summary = routes.map((route) => ({
       route: route.code,
       label: route.label,
@@ -79,13 +81,14 @@ export async function buildRecommendations(priceSeries: Record<string, SitePrice
           {
             role: "system",
             content: [
+              `Today's date is ${todayStr} (Vietnam local time, UTC+7). Use this as the reference point for any date you return — do not rely on your own assumption of the current date, which may be wrong.`,
               "You are a corporate travel cost analyst for a company in Vietnam, advising the travel/finance team on when staff should book flights.",
               "You will receive fare history (VND, one-way economy) from the last 7 scrapes across multiple sites, for several routes.",
               "For each route: look at the direction and steadiness of the trend across sites, not just the single cheapest point. Weight the more recent points more heavily than older ones.",
               "Account for Vietnam-specific demand patterns where relevant: fares typically rise sharply in the weeks before Tet (Lunar New Year) and around major domestic holidays/long weekends, and are usually softer mid-week and outside school holiday periods.",
               "Do not invent specific promotions, sales, or named events that aren't implied by the data — base the recommendation only on the price pattern given.",
               "Be decisive: give a clear book-by date and a plain reason, not hedging language.",
-              'Respond with ONLY a raw JSON array, no prose, no markdown code fences, no explanation before or after. Each item: {"routeCode": string, "recommendation": string (max 22 words, plain analyst tone, no exclamation marks), "bookByDate": ISO date string within the next 10 days, "confidence": "low"|"medium"|"high"}.',
+              `Respond with ONLY a raw JSON array, no prose, no markdown code fences, no explanation before or after. Each item: {"routeCode": string, "recommendation": string (max 22 words, plain analyst tone, no exclamation marks), "bookByDate": ISO date string strictly between ${todayStr} and 10 days after it, "confidence": "low"|"medium"|"high"}.`,
               "confidence should be \"high\" only when the trend is consistent across at least two sites; otherwise use \"medium\" or \"low\".",
             ].join(" "),
           },
@@ -102,7 +105,24 @@ export async function buildRecommendations(priceSeries: Record<string, SitePrice
     const cleaned = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed) || parsed.length === 0) return heuristicRecommendations(priceSeries, routes);
-    return parsed;
+
+    // Safety net: never trust a date outside a sane window, even after
+    // explicitly anchoring the prompt above — reject silently rather than
+    // show a nonsense date like "16 Feb" when it's actually July.
+    const fallback = heuristicRecommendations(priceSeries, routes);
+    const now = Date.now();
+    const maxWindow = 14 * 24 * 60 * 60 * 1000;
+    const validated: RouteRecommendation[] = parsed.map((rec: any) => {
+      const bookByTime = new Date(rec?.bookByDate).getTime();
+      const isSaneDate = !Number.isNaN(bookByTime) && bookByTime >= now - 24 * 60 * 60 * 1000 && bookByTime <= now + maxWindow;
+      if (isSaneDate && typeof rec?.routeCode === "string" && typeof rec?.recommendation === "string") {
+        return rec as RouteRecommendation;
+      }
+      const fallbackForRoute = fallback.find((f) => f.routeCode === rec?.routeCode);
+      return fallbackForRoute ?? fallback[0];
+    });
+
+    return validated;
   } catch {
     return heuristicRecommendations(priceSeries, routes);
   }

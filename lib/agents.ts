@@ -2,6 +2,7 @@ import { TinyFish, RunStatus, BrowserProfile } from "@tiny-fish/sdk";
 import type { Run } from "@tiny-fish/sdk";
 import type { SitePriceSeries, AgentStatus, PricePoint, RouteCode, SiteInfo, RouteInfo } from "./types";
 import { SITES } from "./seed";
+import { getVietnamDateString } from "./date";
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 360; // 30 minutes at 5s intervals — safety valve, not a real cap
@@ -27,19 +28,6 @@ function getClient(): TinyFish | null {
   if (!apiKey) return null;
   if (!_client) _client = new TinyFish({ apiKey, timeout: 60_000, maxRetries: 2 });
   return _client;
-}
-
-// Vietnam is UTC+7. Using the server's UTC clock for "today" was wrong —
-// anywhere from 17:00 UTC onward, Vietnam has already rolled over to the
-// next calendar day while the server (e.g. a GitHub Actions runner, always
-// UTC) still thinks it's the previous one.
-function getVietnamDateString(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 }
 
 // TinyFish's documented best practice for repeated/scheduled scraping is to
